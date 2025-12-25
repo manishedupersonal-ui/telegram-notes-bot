@@ -1,6 +1,8 @@
 import os
 import logging
 from dotenv import load_dotenv
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from telegram import Update
 from telegram.ext import (
@@ -79,9 +81,25 @@ async def notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = "\n".join(f"- {n[0]}" for n in notes)
     await update.message.reply_text(message)
 
+# ------------------ HEALTH SERVER ------------------
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    server.serve_forever()
+
 # ------------------ APP ------------------
 
 def main():
+    # start health server FIRST
+    Thread(target=run_health_server, daemon=True).start()
+
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
